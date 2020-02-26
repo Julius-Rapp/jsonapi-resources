@@ -4,6 +4,37 @@ def set_content_type_header!
   @request.headers['Content-Type'] = JSONAPI::MEDIA_TYPE
 end
 
+class Api::V6::AuthorDetailsControllerTest < ActionController::TestCase
+  def after_teardown
+    Api::V6::AuthorDetailResource.paginator :none # TODO: ???
+  end
+
+  def test_that_the_last_two_author_details_belong_to_an_author
+    Api::V6::AuthorDetailResource.paginator :offset
+
+    total_count = AuthorDetail.count
+    assert_operator total_count, :>=, 2
+
+    assert_cacheable_get :index, params: {sort: :id, include: :author, page: {limit: 10, offset: total_count - 2}}
+    assert_response :success
+    assert_equal 2, json_response['data'].size
+    assert_not_nil json_response['data'][0]['relationships']['author']['data']
+    assert_not_nil json_response['data'][1]['relationships']['author']['data']
+  end
+
+  def test_that_the_last_author_detail_includes_its_author_even_if_returned_as_the_single_entry_on_a_page_with_nonzero_offset
+    Api::V6::AuthorDetailResource.paginator :offset
+
+    total_count = AuthorDetail.count
+    assert_operator total_count, :>=, 2
+
+    assert_cacheable_get :index, params: {sort: :id, include: :author, page: {limit: 10, offset: total_count - 1}}
+    assert_response :success
+    assert_equal 1, json_response['data'].size
+    assert_not_nil json_response['data'][0]['relationships']['author']['data']
+  end
+end
+
 class PostsControllerTest < ActionController::TestCase
   def setup
     super
